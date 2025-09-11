@@ -1,0 +1,1 @@
+Chạy hai file py
