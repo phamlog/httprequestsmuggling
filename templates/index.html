@@ -1,58 +1,76 @@
 <!doctype html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8" />
-  <title>Index</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    :root{
-      --bg1:#8EC5FC; --bg2:#E0C3FC;
-      --card:#ffffff; --text:#0f172a; --muted:#64748b;
-      --primary:#6366f1; --primary-600:#5458f0; --primary-700:#4044ee;
-      --ring: rgba(99,102,241,.35);
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial;
-      color:var(--text);
-      background: linear-gradient(135deg, var(--bg1), var(--bg2)) fixed;
-      min-height:100vh; display:grid; place-items:center; padding:24px;
-    }
-    .card{
-      width:min(680px, 92vw); background:var(--card); border-radius:20px;
-      box-shadow: 0 20px 60px rgba(2,6,23,.15);
-      overflow:hidden; animation:pop .5s ease-out both;
-    }
-    .hero{
-      background: radial-gradient(1200px 400px at 0% 0%, rgba(255,255,255,.6), transparent),
-                  radial-gradient(1200px 400px at 100% 0%, rgba(255,255,255,.35), transparent),
-                  linear-gradient(135deg,#a78bfa,#60a5fa);
-      color:#fff; padding:32px 28px;
-    }
-    .hero h1{ margin:0 0 8px; font-size:32px; letter-spacing:.3px }
-    .hero p{ margin:0; opacity:.95 }
-    .body{ padding:28px }
-    .lead{ color:var(--muted); margin:0 0 16px; font-size:16px }
-    .btn{
-      display:inline-block; background:var(--primary); color:#fff; text-decoration:none;
-      padding:12px 18px; border-radius:12px; font-weight:600; transition:.2s ease;
-      box-shadow:0 8px 24px var(--ring);
-    }
-    .btn:hover{ background:var(--primary-600); transform:translateY(-1px) }
-    .btn:active{ background:var(--primary-700); transform:translateY(0) }
-    @keyframes pop{ from{ transform:translateY(8px); opacity:0 } to{ transform:none; opacity:1 } }
-  </style>
-</head>
-<body>
-  <main class="card">
-    <section class="hero">
-      <h1>Trang Index</h1>
-      <p>Lab HTTP Request Smuggling (CL.TE) – demo login → admin</p>
-    </section>
-    <section class="body">
-      <p class="lead">Bắt đầu tại trang đăng nhập để kiểm thử luồng.</p>
-      <a class="btn" href="/login">Đi tới /login</a>
-    </section>
-  </main>
-</body>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Demo Login</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f4f6f8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .container {
+        background: #fff;
+        padding: 2rem 2.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        width: 320px;
+        text-align: center;
+      }
+      h1 {
+        margin-bottom: 1.5rem;
+        color: #333;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      input {
+        padding: 0.6rem;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 1rem;
+      }
+      button {
+        background: #007BFF;
+        color: white;
+        border: none;
+        padding: 0.7rem;
+        border-radius: 6px;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      p {
+        margin-top: 1.2rem;
+        font-size: 0.9rem;
+        color: #555;
+      }
+      strong {
+        color: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Demo Login</h1>
+      <form action="/login" method="post">
+        <input name="username" placeholder="Username" required />
+        <input name="password" type="password" placeholder="Password" required />
+        <button type="submit">Login</button>
+      </form>
+
+      <p>Try: <strong>alice / alice</strong> or <strong>admin / ????</strong></p>
+      <p style="font-size: 0.8rem; color: #888;">
+        /admin is protected — proxy may inject internal header on CL+TE sequence.
+      </p>
+    </div>
+  </body>
 </html>

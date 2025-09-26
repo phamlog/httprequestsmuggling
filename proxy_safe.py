@@ -1,11 +1,4 @@
-# proxy_safe.py (LISTEN_PORT=8888) - có log chi tiết & nới điều kiện chèn header
-# - Frontend CL-first (ưu tiên Content-Length)
-# - GIỮ Transfer-Encoding để backend TE-first
-# - Sau 1 request CL+TE, request KẾ TIẾP có path /admin sẽ được chèn X-Internal-Admin: 1
-#   (không bắt buộc request đó phải đến 100% từ buffer)
-# - Tự reconnect upstream nếu backend trả Connection: close
-# - Log: path, used_only_carry, CL/TE, armed-flag, inject, server_closed
-
+# proxy_safe.py
 import socket
 import threading
 import re
@@ -21,9 +14,7 @@ CLIENT_RECV_TIMEOUT = 8.0
 UPSTREAM_RECV_TIMEOUT = 10.0
 IDLE_TIMEOUT = 30.0
 
-# KHÔNG loại "transfer-encoding" để backend có thể TE-first
 HOP_BY_HOP_DROP = {"proxy-connection", "connection", "keep-alive", "upgrade"}
-
 REQUEST_LINE_RE = re.compile(rb"^([A-Z]{3,10})\s+(\S+)\s+HTTP/1\.[01]\r\n")
 
 def set_timeouts(sock, rcv=CLIENT_RECV_TIMEOUT):
@@ -38,10 +29,6 @@ def recv_some(sock, bufsize=4096):
         return b""
 
 def recv_until(sock, marker, carry=b"", max_bytes=1024*1024):
-    """
-    Đọc đến marker, trả (head, rest, used_only_carry)
-    - used_only_carry = True nếu hoàn toàn tìm thấy trong carry (không đọc thêm từ socket)
-    """
     data = bytearray(carry)
     used_socket = False
     while True:
@@ -52,7 +39,7 @@ def recv_until(sock, marker, carry=b"", max_bytes=1024*1024):
             used_only_carry = (not used_socket) and (len(carry) > 0)
             return head, rest, used_only_carry
         if len(data) > max_bytes:
-            raise ValueError("Header quá lớn")
+            raise ValueError("Header too large")
         chunk = recv_some(sock)
         if not chunk:
             return None, bytes(data), False
@@ -125,9 +112,6 @@ def read_exact(sock, need, carry=b""):
     return body, rest
 
 def parse_response_and_relay(upstream, client):
-    """
-    Trả (ok, conn_close_from_server)
-    """
     upstream.settimeout(UPSTREAM_RECV_TIMEOUT)
     head, rest, _ = recv_until(upstream, b"\r\n\r\n")
     if not head:
@@ -141,6 +125,7 @@ def parse_response_and_relay(upstream, client):
     conn_hdr = lower.get("connection", "")
     server_wants_close = "close" in conn_hdr.lower()
 
+    # handle chunked upstream
     if te and "chunked" in te.lower():
         buf = bytearray(rest)
         while True:
@@ -175,6 +160,7 @@ def parse_response_and_relay(upstream, client):
                 break
         return True, server_wants_close
 
+    # handle content-length upstream
     if cl is not None:
         try:
             need = int(cl)
@@ -191,7 +177,7 @@ def parse_response_and_relay(upstream, client):
             client.sendall(body)
             return True, server_wants_close
 
-    # Không CL, không TE -> best-effort
+    # best-effort
     upstream.settimeout(1.0)
     client.settimeout(1.0)
     if rest:
@@ -218,7 +204,7 @@ def handle_client(client_sock, client_addr):
     upstream = new_upstream()
 
     carry = b""
-    inject_admin_on_next = False  # “armed” sau khi gặp CL+TE
+    inject_admin_on_next = False  # armed flag
 
     try:
         last_active = time.time()
@@ -228,7 +214,7 @@ def handle_client(client_sock, client_addr):
                 break
 
             if not REQUEST_LINE_RE.match(head):
-                print("[proxy] non-HTTP start-line; skipping junk")
+                print("[proxy] non-HTTP start-line; skipping")
                 continue
 
             req_line, hdrs, lower = parse_headers(head)
@@ -237,7 +223,7 @@ def handle_client(client_sock, client_addr):
             has_te = "transfer-encoding" in lower and "chunked" in lower.get("transfer-encoding", "").lower()
             print(f"[proxy] >>> got request path={path} used_only_carry={used_only_carry} has_cl={has_cl} has_te={has_te} armed={inject_admin_on_next}")
 
-            # CL-first: chỉ đọc đúng số byte theo CL
+            # Read body according to CL-first strategy
             body = b""
             if has_cl:
                 try:
@@ -255,20 +241,20 @@ def handle_client(client_sock, client_addr):
                     body = carry + more
                     carry = carry2
 
-            # Quyết định chèn header hay không (đÃ NỚI ĐIỀU KIỆN)
+            # decide inject
             inject_internal = False
             if inject_admin_on_next and path.startswith("/admin"):
                 inject_internal = True
                 inject_admin_on_next = False
             elif used_only_carry:
-                # nếu request đến từ buffer nhưng không phải /admin, tiêu thụ cơ hội
+                # consume opportunity even if not /admin
                 inject_admin_on_next = False
-            print(f"[proxy]     inject_internal={inject_internal} (add X-Internal-Admin only if True)")
+            print(f"[proxy]     inject_internal={inject_internal}")
 
             fwd_hdrs = build_forward_headers(hdrs, xff_ip, inject_internal_admin=inject_internal)
             fwd_head = headers_to_bytes(req_line, fwd_hdrs)
 
-            # Gửi lên upstream (reconnect nếu cần)
+            # send to upstream (reconnect if needed)
             try:
                 upstream.sendall(fwd_head + body)
             except Exception as e:
@@ -280,11 +266,10 @@ def handle_client(client_sock, client_addr):
                 upstream = new_upstream()
                 upstream.sendall(fwd_head + body)
 
-            # Đặt cờ cho lần tới nếu đây là CL.TE
+            # set armed if CL+TE
             if has_cl and has_te:
                 inject_admin_on_next = True
                 print("[proxy]     this was CL+TE; ARMED for next request")
-            # else: giữ nguyên trạng thái
 
             ok, server_closed = parse_response_and_relay(upstream, client_sock)
             print(f"[proxy] <<< upstream_response ok={ok} server_closed={server_closed}")
