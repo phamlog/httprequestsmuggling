@@ -11,3 +11,5 @@ Templates (index.html,ok.html): giao diện đẹp, có gợi ý về cách khai
 Khi khai thác thành công, truy cập /admin sẽ hiển thị flag
 
 Mục tiêu của lab là giúp bạn thực hành cách gửi yêu cầu smuggled để vượt qua cơ chế xác thực thông thường, từ đó truy cập được /admin.
+
+(Lab hơi khác 1 tí do kỹ thuật code, vui lòng đọc kỹ code để có hướng khai thác đúng)
